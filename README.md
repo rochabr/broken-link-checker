@@ -1,17 +1,4 @@
-### Markdown File Handling
-
-The script has special handling for Markdown (.md) files, which are commonly used in GitHub repositories but may be processed differently when served on websites. When encountering a Markdown file, the script will:
-
-1. Try the original URL with `.md` extension
-2. Try the URL with the `.md` extension removed
-3. Try the URL with `.md` replaced by `.html`
-
-This handles various ways websites might render Markdown:
-- Serving the raw `.md` file directly
-- Processing Markdown into HTML without changing the URL (common in static site generators)
-- Converting `.md` files to `.html` files with the same base name
-
-This prevents false positives when checking sites that use Markdown files.# Broken Link Checker
+# Broken Link Checker
 
 [![Python Version](https://img.shields.io/badge/python-3.6%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -24,7 +11,7 @@ A robust Python utility for crawling websites and identifying broken links. This
 - **Concurrent Processing**: Configurable multi-threading for faster scanning
 - **Comprehensive Link Detection**: Checks `<a>` tags, images, scripts, iframes, and stylesheets
 - **Smart Error Handling**: Multiple retry attempts with detailed error reporting
-- **Domain Filtering**: Option to focus on internal links or include external resources
+- **Domain Control**: Check only specific domains, the starting domain, or all domains
 - **URL Ignoring**: Exclude specific URL patterns from being checked using regex
 - **Markdown Support**: Smart handling of Markdown files that might be rendered as HTML
 - **Report Generation**: Save results to a text file or view in the console
@@ -79,7 +66,8 @@ python broken_link_checker.py https://your-website.com
 ```
 usage: broken_link_checker.py [-h] [--threads THREADS] [--timeout TIMEOUT]
                              [--user-agent USER_AGENT] [--retries RETRIES]
-                             [--all-domains] [--ignore PATTERN] [--output OUTPUT]
+                             [--all-domains | --allowed-domains ALLOWED_DOMAINS]
+                             [--ignore PATTERN] [--output OUTPUT]
                              url
 
 Crawl a website and check for broken links.
@@ -95,6 +83,8 @@ optional arguments:
                         Custom user agent string (default: BrokenLinkChecker/1.0)
   --retries RETRIES     Number of times to retry failed requests (default: 2)
   --all-domains         Check links on all domains, not just the starting domain
+  --allowed-domains ALLOWED_DOMAINS
+                        List of domains to check. Can be used multiple times.
   --ignore PATTERN      Regex pattern for URLs to ignore. Can be used multiple times.
   --output OUTPUT, -o OUTPUT
                         Save the report to a file instead of printing to console
@@ -135,6 +125,51 @@ Combine multiple options:
 python broken_link_checker.py https://example.com --threads 10 --all-domains --ignore "googletagmanager\.com" -o report.txt
 ```
 
+Check only specific domains:
+```bash
+# Only check links on example.com and api.example.com
+python broken_link_checker.py https://example.com --allowed-domains example.com --allowed-domains api.example.com
+```
+
+### Domain Control Options
+
+The script offers three different ways to control which domains are crawled:
+
+1. **Default Mode (No Flags)**: Only checks links on the same domain as the starting URL.
+   ```bash
+   python broken_link_checker.py https://example.com
+   ```
+   This will only check links within example.com.
+
+2. **All Domains Mode**: Checks links on all domains encountered.
+   ```bash
+   python broken_link_checker.py https://example.com --all-domains
+   ```
+   This will check all links, regardless of domain.
+
+3. **Allowed Domains Mode**: Only checks links on domains you specifically allow.
+   ```bash
+   python broken_link_checker.py https://example.com --allowed-domains example.com --allowed-domains docs.example.com
+   ```
+   This will only check links on example.com and docs.example.com.
+
+Note: `--all-domains` and `--allowed-domains` are mutually exclusive and cannot be used together.
+
+### Markdown File Handling
+
+The script has special handling for Markdown (.md) files, which are commonly used in GitHub repositories but may be processed differently when served on websites. When encountering a Markdown file, the script will:
+
+1. Try the original URL with `.md` extension
+2. Try the URL with the `.md` extension removed
+3. Try the URL with `.md` replaced by `.html`
+
+This handles various ways websites might render Markdown:
+- Serving the raw `.md` file directly
+- Processing Markdown into HTML without changing the URL (common in static site generators)
+- Converting `.md` files to `.html` files with the same base name
+
+This prevents false positives when checking sites that use Markdown files.
+
 ## 📊 Sample Output
 
 ```
@@ -153,6 +188,7 @@ Page: https://example.com/contact
 -------------------------------------------------------------------
 Total URLs crawled: 42
 External links found: 15
+Only checked domain: example.com
 -------------------------------------------------------------------
 ```
 
@@ -216,8 +252,6 @@ Then add this batch file to Windows Task Scheduler.
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
 
 ---
 

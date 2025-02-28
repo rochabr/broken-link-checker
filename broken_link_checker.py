@@ -19,7 +19,8 @@ from bs4 import BeautifulSoup
 
 class LinkChecker:
     def __init__(self, start_url, max_threads=5, user_agent=None, timeout=10, 
-                 max_retries=2, same_domain_only=True, ignore_patterns=None):
+                 max_retries=2, same_domain_only=True, ignore_patterns=None,
+                 allowed_domains=None):
         """
         Initialize the link checker with configuration parameters.
         
@@ -31,6 +32,7 @@ class LinkChecker:
             max_retries (int): Number of times to retry failed requests
             same_domain_only (bool): Whether to only check links on the same domain
             ignore_patterns (list): List of regex patterns for URLs to ignore
+            allowed_domains (list): List of domains to check (overrides same_domain_only)
         """
         self.start_url = start_url
         self.max_threads = max_threads
@@ -58,6 +60,17 @@ class LinkChecker:
         if ignore_patterns:
             for pattern in ignore_patterns:
                 self.ignore_patterns.append(re.compile(pattern))
+                
+        # Set up allowed domains
+        self.allowed_domains = set()
+        if allowed_domains:
+            self.same_domain_only = False  # Override same_domain_only if allowed_domains is set
+            for domain in allowed_domains:
+                # Normalize domains (remove 'www.' prefix if present)
+                normalized_domain = domain.lower()
+                if normalized_domain.startswith('www.'):
+                    normalized_domain = normalized_domain[4:]
+                self.allowed_domains.add(normalized_domain)
 
     def should_visit(self, url):
         """
@@ -82,10 +95,24 @@ class LinkChecker:
             if pattern.search(url):
                 return False
             
-        # If we're checking same domain only, verify the domain
-        if self.same_domain_only:
-            url_domain = urlparse(url).netloc
-            if url_domain != self.domain:
+        # Check if domain is allowed
+        url_domain = urlparse(url).netloc.lower()
+        normalized_domain = url_domain
+        if normalized_domain.startswith('www.'):
+            normalized_domain = normalized_domain[4:]
+            
+        if self.allowed_domains:
+            # If we have a list of allowed domains, check against that
+            if normalized_domain not in self.allowed_domains:
+                self.external_links.add(url)
+                return False
+        elif self.same_domain_only:
+            # Otherwise check against the starting domain if same_domain_only is set
+            start_domain = self.domain.lower()
+            if start_domain.startswith('www.'):
+                start_domain = start_domain[4:]
+                
+            if normalized_domain != start_domain:
                 self.external_links.add(url)
                 return False
                 
@@ -269,6 +296,15 @@ class LinkChecker:
             report_lines.append("-"*80)
             report_lines.append(f"Total URLs crawled: {len(self.visited_urls)}")
             report_lines.append(f"External links found: {len(self.external_links)}")
+            
+            # Add information about domains being checked
+            if self.allowed_domains:
+                report_lines.append(f"Allowed domains: {', '.join(self.allowed_domains)}")
+            elif self.same_domain_only:
+                report_lines.append(f"Only checked domain: {self.domain}")
+            else:
+                report_lines.append("Checked all domains")
+                
             report_lines.append("-"*80)
         
         # Join all lines with newlines
@@ -302,8 +338,14 @@ def main():
                         help="Custom user agent string (default: BrokenLinkChecker/1.0)")
     parser.add_argument("--retries", type=int, default=2, 
                         help="Number of times to retry failed requests (default: 2)")
-    parser.add_argument("--all-domains", action="store_true", 
+    
+    # Domain control options - mutually exclusive
+    domain_group = parser.add_mutually_exclusive_group()
+    domain_group.add_argument("--all-domains", action="store_true", 
                         help="Check links on all domains, not just the starting domain")
+    domain_group.add_argument("--allowed-domains", action="append", default=[], 
+                        help="List of domains to check. Can be used multiple times.")
+    
     parser.add_argument("--ignore", action="append", default=[], 
                         help="Regex pattern for URLs to ignore. Can be used multiple times.")
     parser.add_argument("--output", "-o", 
@@ -313,14 +355,18 @@ def main():
     
     print(f"Starting link check from: {args.url}")
     
+    # Determine domain checking strategy
+    same_domain_only = not args.all_domains and not args.allowed_domains
+    
     checker = LinkChecker(
         args.url,
         max_threads=args.threads,
         user_agent=args.user_agent,
         timeout=args.timeout,
         max_retries=args.retries,
-        same_domain_only=not args.all_domains,
-        ignore_patterns=args.ignore
+        same_domain_only=same_domain_only,
+        ignore_patterns=args.ignore,
+        allowed_domains=args.allowed_domains
     )
     
     try:
